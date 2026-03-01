@@ -139,7 +139,6 @@ import {
   StepEventData,
   ToolEventData,
   MessageEventData,
-  StreamEventData,
   ErrorEventData,
   TitleEventData,
   PlanEventData,
@@ -187,7 +186,6 @@ const createInitialState = () => ({
   shareMode: 'private' as 'private' | 'public',
   linkCopied: false,
   sharingLoading: false,
-  streamingMessageIndex: -1 as number,
 });
 
 // Create reactive state
@@ -212,7 +210,6 @@ const {
   shareMode,
   linkCopied,
   sharingLoading,
-  streamingMessageIndex,
 } = toRefs(state);
 
 // Non-state refs that don't need reset
@@ -246,31 +243,8 @@ const getLastStep = (): StepContent | undefined => {
   return messages.value.filter(message => message.type === 'step').pop()?.content as StepContent;
 }
 
-// Handle streaming token event - append token to live streaming message
-const handleStreamEvent = (streamData: StreamEventData) => {
-  if (streamingMessageIndex.value === -1 || streamingMessageIndex.value >= messages.value.length) {
-    messages.value.push({
-      type: 'assistant',
-      content: {
-        content: streamData.token,
-        timestamp: streamData.timestamp,
-        streaming: true,
-      } as MessageContent & { streaming: boolean },
-    });
-    streamingMessageIndex.value = messages.value.length - 1;
-  } else {
-    const msg = messages.value[streamingMessageIndex.value];
-    (msg.content as MessageContent).content += streamData.token;
-  }
-}
-
 // Handle message event
 const handleMessageEvent = (messageData: MessageEventData) => {
-  if (messageData.role === 'assistant' && streamingMessageIndex.value !== -1) {
-    messages.value.splice(streamingMessageIndex.value, 1);
-    streamingMessageIndex.value = -1;
-  }
-
   messages.value.push({
     type: messageData.role,
     content: {
@@ -359,30 +333,22 @@ const handlePlanEvent = (planData: PlanEventData) => {
 
 // Main event handler function
 const handleEvent = (event: AgentSSEEvent) => {
-  if (event.event === 'stream') {
-    handleStreamEvent(event.data as StreamEventData);
-  } else if (event.event === 'message') {
+  if (event.event === 'message') {
     handleMessageEvent(event.data as MessageEventData);
   } else if (event.event === 'tool') {
     handleToolEvent(event.data as ToolEventData);
   } else if (event.event === 'step') {
     handleStepEvent(event.data as StepEventData);
   } else if (event.event === 'done') {
-    streamingMessageIndex.value = -1;
     notifyTaskComplete(title.value !== t('New Chat') ? title.value : undefined);
-  } else if (event.event === 'wait') {
-    streamingMessageIndex.value = -1;
   } else if (event.event === 'error') {
-    streamingMessageIndex.value = -1;
     handleErrorEvent(event.data as ErrorEventData);
   } else if (event.event === 'title') {
     handleTitleEvent(event.data as TitleEventData);
   } else if (event.event === 'plan') {
     handlePlanEvent(event.data as PlanEventData);
   }
-  if (event.event !== 'stream') {
-    lastEventId.value = event.data.event_id;
-  }
+  lastEventId.value = event.data.event_id;
 }
 
 const handleSubmit = () => {

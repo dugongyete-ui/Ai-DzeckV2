@@ -16,15 +16,12 @@ from app.domain.models.event import (
     ToolStatus,
     ErrorEvent,
     MessageEvent,
-    StreamEvent,
     DoneEvent,
 )
 from app.domain.repositories.agent_repository import AgentRepository
 from app.domain.utils.json_parser import JsonParser
 
 logger = logging.getLogger(__name__)
-
-
 class BaseAgent(ABC):
     """
     Base agent class, defining the basic behavior of the agent
@@ -69,6 +66,7 @@ class BaseAgent(ABC):
 
     async def invoke_tool(self, tool: BaseTool, function_name: str, arguments: Dict[str, Any]) -> ToolResult:
         """Invoke specified tool, with retry mechanism"""
+
         retries = 0
         while retries <= self.max_retries:
             try:
@@ -81,87 +79,12 @@ class BaseAgent(ABC):
                 else:
                     logger.exception(f"Tool execution failed, {function_name}, {arguments}")
                     break
+        
         return ToolResult(success=False, message=last_error)
-
-    async def _stream_ask_to_memory(
-        self,
-        messages: List[Dict[str, Any]],
-        result_box: List,
-        format: Optional[str] = None
-    ) -> AsyncGenerator[StreamEvent, None]:
-        """Stream LLM call, emit StreamEvents, store final message in result_box[0]."""
-        await self._add_to_memory(messages)
-        response_format = {"type": format} if format else None
-
-        final_message = None
-        for attempt in range(self.max_retries):
-            try:
-                async for chunk_type, chunk_data in self.llm.ask_stream(
-                    self.memory.get_messages(),
-                    tools=self.get_available_tools(),
-                    response_format=response_format,
-                    tool_choice=self.tool_choice
-                ):
-                    if chunk_type == "token":
-                        yield StreamEvent(token=chunk_data)
-                    elif chunk_type == "result":
-                        final_message = chunk_data
-
-                if final_message is not None:
-                    break
-            except Exception as e:
-                logger.error(f"Streaming LLM error (attempt {attempt + 1}): {e}")
-                if attempt == self.max_retries - 1:
-                    raise
-                final_message = None
-
-        if final_message is None:
-            raise Exception(f"Failed to get LLM response after {self.max_retries} attempts")
-
-        # Check for empty response - retry with non-streaming if needed
-        if not final_message.get("content") and not final_message.get("tool_calls"):
-            logger.warning("Streaming returned empty content, retrying with non-streaming")
-            await self._add_to_memory([
-                {"role": "assistant", "content": ""},
-                {"role": "user", "content": "no thinking, please continue"}
-            ])
-            fallback = await self.llm.ask(
-                self.memory.get_messages(),
-                tools=self.get_available_tools(),
-                response_format=response_format,
-                tool_choice=self.tool_choice
-            )
-            final_message = fallback
-
-        filtered_message = {
-            "role": "assistant",
-            "content": final_message.get("content") or "",
-        }
-        if final_message.get("tool_calls"):
-            filtered_message["tool_calls"] = final_message["tool_calls"][:1]
-
-        await self._add_to_memory([filtered_message])
-        result_box.append(filtered_message)
-
+    
     async def execute(self, request: str, format: Optional[str] = None) -> AsyncGenerator[BaseEvent, None]:
         format = format or self.format
-
-        # Stream initial request
-        result_box = []
-        async for event in self._stream_ask_to_memory(
-            [{"role": "user", "content": request}],
-            result_box,
-            format
-        ):
-            yield event
-
-        if not result_box:
-            yield ErrorEvent(error="Failed to get response from AI")
-            return
-
-        message = result_box[0]
-
-        # Process tool call loop
+        message = await self.ask(request, format)
         for _ in range(self.max_iterations):
             if not message.get("tool_calls"):
                 break
@@ -186,6 +109,7 @@ class BaseAgent(ABC):
                     })
                     continue
 
+                # Generate event before tool call
                 yield ToolEvent(
                     status=ToolStatus.CALLING,
                     tool_call_id=tool_call_id,
@@ -196,6 +120,7 @@ class BaseAgent(ABC):
 
                 result = await self.invoke_tool(tool, function_name, function_args)
                 
+                # Generate event after tool call
                 yield ToolEvent(
                     status=ToolStatus.CALLED,
                     tool_call_id=tool_call_id,
@@ -205,27 +130,19 @@ class BaseAgent(ABC):
                     function_result=result
                 )
 
-                tool_responses.append({
+                tool_response = {
                     "role": "tool",
                     "function_name": function_name,
                     "tool_call_id": tool_call_id,
                     "content": result.model_dump_json()
-                })
+                }
+                tool_responses.append(tool_response)
 
-            # For tool-call follow-ups, stream the next response too
-            result_box2 = []
-            async for event in self._stream_ask_to_memory(tool_responses, result_box2):
-                yield event
-
-            if not result_box2:
-                yield ErrorEvent(error="Failed to get tool follow-up response from AI")
-                return
-            message = result_box2[0]
+            message = await self.ask_with_messages(tool_responses)
         else:
             yield ErrorEvent(error="Maximum iteration count reached, failed to complete the task")
-            return
         
-        yield MessageEvent(message=message.get("content") or "")
+        yield MessageEvent(message=message["content"])
     
     async def _ensure_memory(self):
         if not self.memory:
