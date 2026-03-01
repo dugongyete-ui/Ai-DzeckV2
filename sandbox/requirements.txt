@@ -1,0 +1,8 @@
+fastapi
+uvicorn
+pydantic
+email-validator
+python-multipart
+pydantic-settings
+supervisor>=4.3.0
+websockify>=0.13.0
