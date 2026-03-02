@@ -244,26 +244,3 @@ export async function getSharedSessionFiles(sessionId: string): Promise<FileInfo
   return response.data.data;
 }
 
-export interface ImageGenerateResponse {
-  url: string;
-  prompt: string;
-  width: number;
-  height: number;
-}
-
-/**
- * Generate an image using AI (Pollinations image API)
- * @param prompt Text description of the image to generate
- * @param width Image width (default 1024)
- * @param height Image height (default 1024)
- * @returns Image URL and metadata
- */
-export async function generateImage(
-  prompt: string,
-  width: number = 1024,
-  height: number = 1024,
-): Promise<ImageGenerateResponse> {
-  const params = new URLSearchParams({ prompt, width: String(width), height: String(height) });
-  const response = await apiClient.get<ApiResponse<ImageGenerateResponse>>(`/image/generate?${params}`);
-  return response.data.data;
-}

@@ -18,6 +18,8 @@ warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
 err() { echo -e "${RED}[ERROR]${NC} $1"; }
 
 WORKSPACE=/home/runner/workspace
+PIP="pip install --user -q --disable-pip-version-check"
+export PATH="/home/runner/workspace/.pythonlibs/bin:$PATH"
 
 echo ""
 echo "=============================================="
@@ -26,15 +28,15 @@ echo "=============================================="
 echo ""
 
 # ─── 1. PYTHON PACKAGES (Backend) ─────────────────────────────────────────────
-info "Menginstall Python packages (backend) dari backend/requirements.txt..."
-pip install --user -q --disable-pip-version-check -r $WORKSPACE/backend/requirements.txt \
-    2>&1 | grep -E "(Successfully|ERROR|error)" || true
+info "Menginstall Python packages (backend)..."
+cd $WORKSPACE/backend
+$PIP -r requirements.txt 2>&1 | grep -E "(Successfully|ERROR|error|already)" || true
 log "Backend Python packages selesai"
 
 # ─── 2. PYTHON PACKAGES (Sandbox) ─────────────────────────────────────────────
-info "Menginstall Python packages (sandbox) dari sandbox/requirements.txt..."
-pip install --user -q --disable-pip-version-check -r $WORKSPACE/sandbox/requirements.txt \
-    2>&1 | grep -E "(Successfully|ERROR|error)" || true
+info "Menginstall Python packages (sandbox)..."
+cd $WORKSPACE/sandbox
+$PIP -r requirements.txt 2>&1 | grep -E "(Successfully|ERROR|error|already)" || true
 log "Sandbox Python packages selesai"
 
 # ─── 3. NODE.JS PACKAGES (Frontend) ──────────────────────────────────────────
@@ -49,29 +51,36 @@ info "Mengecek konfigurasi backend/.env..."
 if [ ! -f "$WORKSPACE/backend/.env" ]; then
     warn "File backend/.env tidak ditemukan, membuat dari template..."
     cat > $WORKSPACE/backend/.env << 'EOF'
-API_KEY=pollinations
+# LLM - Pollinations AI (API Key dari enter.pollinations.ai)
+API_KEY=sk_z06J0JrX9oJyaDHB1lMBOBSZCNO0d4FG
 API_BASE=https://text.pollinations.ai/v1
-MODEL_NAME=openai
+MODEL_NAME=openai-fast
 TEMPERATURE=0.7
 MAX_TOKENS=8000
 
+# MongoDB Atlas
 MONGODB_URI=mongodb+srv://galerizaki_db_user:wTkfzrqewY5qCxYG@cluster0.vmiek8b.mongodb.net/manus?retryWrites=true&w=majority
 MONGODB_DATABASE=manus
 
+# Redis Labs
 REDIS_HOST=redis-16364.c279.us-central1-1.gce.cloud.redislabs.com
 REDIS_PORT=16364
 REDIS_DB=0
 REDIS_PASSWORD=0W7ImuMIUrkUTF0wxYSkIWmc8MRjPrYX
 REDIS_SSL=false
 
+# Sandbox
 SANDBOX_ADDRESS=127.0.0.1
 
+# Search
 SEARCH_PROVIDER=bing
 
+# Auth
 AUTH_PROVIDER=local
 LOCAL_AUTH_EMAIL=admin@example.com
 LOCAL_AUTH_PASSWORD=admin123
 
+# JWT
 JWT_SECRET_KEY=Namakamusiapa123
 JWT_ALGORITHM=HS256
 JWT_ACCESS_TOKEN_EXPIRE_MINUTES=60
@@ -87,7 +96,7 @@ fi
 # ─── 5. BERSIHKAN PORT LAMA ─────────────────────────────────────────────────
 info "Membersihkan port yang mungkin masih digunakan..."
 
-for PORT in 8080 8000 5000 5900 5901 9222; do
+for PORT in 8082 8080 8000 5000 5900 5901 9222; do
     PID=$(lsof -ti :$PORT 2>/dev/null) || true
     if [ -n "$PID" ]; then
         kill -9 $PID 2>/dev/null || true
@@ -99,7 +108,7 @@ pkill -f "supervisord" 2>/dev/null || true
 pkill -f "Xvfb :1" 2>/dev/null || true
 pkill -f "x11vnc" 2>/dev/null || true
 pkill -f "websockify" 2>/dev/null || true
-pkill -f "uvicorn.*8080" 2>/dev/null || true
+pkill -f "uvicorn" 2>/dev/null || true
 rm -f /tmp/supervisor.sock /tmp/supervisord.pid /tmp/.X1-lock /tmp/.X11-unix/X1 2>/dev/null || true
 
 sleep 2
@@ -120,8 +129,8 @@ echo "    bash start_sandbox.sh   (Terminal 1)"
 echo "    bash start_backend.sh   (Terminal 2)"
 echo "    bash start_frontend.sh  (Terminal 3)"
 echo ""
-echo "Workflows yang dikonfigurasi:"
-echo "  - Sandbox          → port 8080"
+echo "Workflows:"
+echo "  - Sandbox          → port 8080 (dev) / 8082 (prod)"
 echo "  - Backend          → port 8000"
 echo "  - Start application → port 5000 (webview)"
 echo ""
@@ -129,7 +138,9 @@ echo "Login credentials:"
 echo "  Email    : admin@example.com"
 echo "  Password : admin123"
 echo ""
-echo "API Endpoint LLM:"
-echo "  URL   : https://text.pollinations.ai/v1"
-echo "  Model : openai (GPT-4o compatible, GRATIS)"
+echo "API LLM:"
+echo "  Provider : Pollinations AI (enter.pollinations.ai)"
+echo "  Endpoint : https://text.pollinations.ai/v1"
+echo "  Model    : openai-fast"
+echo "  Dashboard: https://enter.pollinations.ai/ (lihat usage)"
 echo ""

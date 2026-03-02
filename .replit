@@ -2,7 +2,7 @@ modules = ["python-3.11", "nodejs-20"]
 
 [nix]
 channel = "stable-25_05"
-packages = ["cargo", "chromium", "gitFull", "libiconv", "libxcrypt", "openssl", "pkg-config", "playwright-driver", "rustc", "socat", "x11vnc", "xorg.xorgserver"]
+packages = ["chromium", "libiconv", "libxcrypt", "openssl", "pkg-config", "socat", "x11vnc", "xorg.xorgserver"]
 
 [workflows]
 runButton = "Project"
@@ -88,5 +88,5 @@ externalPort = 3000
 expertMode = true
 
 [deployment]
-deploymentTarget = "cloudrun"
+deploymentTarget = "vm"
 run = ["bash", "/home/runner/workspace/start.sh"]

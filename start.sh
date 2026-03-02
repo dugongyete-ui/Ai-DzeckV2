@@ -1,6 +1,8 @@
 #!/bin/bash
 set -e
 
+export PATH="/home/runner/workspace/.pythonlibs/bin:$PATH"
+
 echo "=== Starting Dzeck AI ==="
 echo "PORT env var: ${PORT:-not set, using 5000}"
 
