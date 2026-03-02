@@ -1,6 +1,5 @@
-from typing import Optional, AsyncGenerator, List
+from typing import Optional, AsyncGenerator, List, Type
 import logging
-import time
 from datetime import datetime
 from app.domain.models.session import Session, SessionStatus
 from app.domain.external.llm import LLM
@@ -13,13 +12,21 @@ from app.domain.repositories.session_repository import SessionRepository
 from app.domain.services.agent_task_runner import AgentTaskRunner
 from app.domain.external.task import Task
 from app.domain.utils.json_parser import JsonParser
-from typing import Type
 from app.domain.external.file import FileStorage
 from app.domain.models.file import FileInfo
 from app.domain.repositories.mcp_repository import MCPRepository
 
 # Setup logging
 logger = logging.getLogger(__name__)
+
+
+async def _inngest_send(event_name: str, data: dict) -> None:
+    """Send an Inngest event safely — ignores errors if Inngest is not configured."""
+    try:
+        from app.infrastructure.external.inngest_setup import send_inngest_event
+        await send_inngest_event(event_name, data)
+    except Exception as e:
+        logger.debug(f"Inngest event skipped ({event_name}): {e}")
 
 class AgentDomainService:
     """
@@ -104,6 +111,13 @@ class AgentDomainService:
         session.task_id = task.id
         await self._session_repository.save(session)
 
+        await _inngest_send("dzeck/agent.task.started", {
+            "session_id": session.id,
+            "agent_id": session.agent_id,
+            "user_id": session.user_id,
+            "task_id": task.id,
+        })
+
         return task
         
     async def _get_task(self, session: Session) -> Optional[Task]:
@@ -183,15 +197,33 @@ class AgentDomainService:
                 logger.debug(f"Got event from Session {session_id}'s event queue: {type(event).__name__}")
                 await self._session_repository.update_unread_message_count(session_id, 0)
                 yield event
-                if isinstance(event, (DoneEvent, ErrorEvent, WaitEvent)):
+                if isinstance(event, DoneEvent):
+                    await _inngest_send("dzeck/agent.task.completed", {
+                        "session_id": session_id,
+                        "user_id": user_id,
+                    })
+                    break
+                if isinstance(event, ErrorEvent):
+                    await _inngest_send("dzeck/agent.task.failed", {
+                        "session_id": session_id,
+                        "user_id": user_id,
+                        "error": getattr(event, "error", str(event)),
+                    })
+                    break
+                if isinstance(event, WaitEvent):
                     break
             
             logger.info(f"Session {session_id} completed")
 
         except Exception as e:
             logger.exception(f"Error in Session {session_id}")
+            await _inngest_send("dzeck/agent.task.failed", {
+                "session_id": session_id,
+                "user_id": user_id,
+                "error": str(e),
+            })
             event = ErrorEvent(error=str(e))
             await self._session_repository.add_event(session_id, event)
-            yield event # TODO: raise api exception
+            yield event
         finally:
             await self._session_repository.update_unread_message_count(session_id, 0)

@@ -40,7 +40,9 @@ Backend (FastAPI) — port 8000
 | Cache | Redis Labs (cloud, port 16364, no SSL) |
 | AI/LLM | Pollinations AI (`https://text.pollinations.ai/v1`), model `openai-fast`, API key via enter.pollinations.ai |
 | Auth | JWT (access + refresh token), bcrypt password hash |
-| Sandbox | Supervisord, Xvfb, Chromium, x11vnc, websockify, Playwright |
+| Sandbox | Supervisord, Xvfb, Chromium, x11vnc, websockify, Playwright (default: Docker) |
+| Sandbox Alt | E2B cloud sandbox (aktifkan via `SANDBOX_PROVIDER=e2b`) |
+| Background Jobs | Inngest (endpoint `/api/inngest`, 3 fungsi terdaftar) |
 | VNC Viewer | noVNC (embedded di frontend) |
 | Code Editor | Monaco Editor |
 | i18n | vue-i18n (default: Bahasa Indonesia) |
@@ -264,6 +266,10 @@ run = ["bash", "/home/runner/workspace/start.sh"]
 28. **Production-readiness improvements** — user registration (AUTH_PROVIDER=password), admin user auto-seeded from .env at startup, ZIP export endpoint + Download as ZIP button in file list, `/api/v1/settings` endpoint returning current model info, Web Notifications API integration (task complete alerts, toggle in settings), sandbox auto-restart on browser unavailability, i18n translations added for all new UI strings (EN/ID/ZH)
 29. **AI Streaming + Image Generation** — LLM responses sekarang di-stream token-by-token (streaming SSE via `StreamEvent`). Model diubah ke `openai-fast` dengan API key Pollinations. Endpoint baru `/api/v1/image/generate` dan `/api/v1/image/proxy` untuk generate image via `image.pollinations.ai`. Frontend handle `stream` event untuk tampilkan teks secara progresif (seperti ChatGPT). `StreamEvent` tidak disimpan di session history (hanya real-time).
 27. **Deployment kembali ke cloudrun dengan perintah salah** — `.replit` berubah lagi ke `cloudrun` dengan run command `npm run server:prod` dan build `npm run expo:static:build` (perintah dari project lain yang tidak ada). File `.bak` docker-compose juga sudah dihapus permanen. Fix: hapus ketiga file `.bak`, jalankan `deployConfig({deploymentTarget: "vm", run: ["bash", "/home/runner/workspace/start.sh"], build: []})` untuk bersihkan semua build command dan kunci ke vm.
+30. **E2B + Inngest Integration** — Integrasi dua layanan cloud:
+    - **E2B** (`E2B_API_KEY`): Implementasi `E2BSandbox` di `backend/app/infrastructure/external/sandbox/e2b_sandbox.py` sebagai alternatif Docker sandbox. Aktifkan dengan env `SANDBOX_PROVIDER=e2b`. Mendukung shell commands dan file operations via E2B cloud API. Browser/VNC tidak tersedia di E2B.
+    - **Inngest** (`INNGEST_API_KEY`, `INNGEST_SIGNING_KEY`): Background job orchestration. Endpoint terdaftar di `/api/inngest` (GET/POST/PUT). Tiga fungsi: `agent-task-started`, `agent-task-completed`, `agent-task-failed` (dengan 3x retry). Setup di `backend/app/infrastructure/external/inngest_setup.py`. Helper `send_inngest_event()` tersedia untuk kirim event dari mana saja.
+    - Config baru: `e2b_api_key`, `sandbox_provider`, `inngest_api_key`, `inngest_signing_key`, `inngest_app_id` di `config.py`.
 
 ---
 

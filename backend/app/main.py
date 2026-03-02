@@ -114,3 +114,10 @@ register_exception_handlers(app)
 
 # Register routes
 app.include_router(router, prefix="/api/v1")
+
+# Register Inngest endpoint (if configured)
+try:
+    from app.infrastructure.external.inngest_setup import setup_inngest
+    setup_inngest(app)
+except Exception as _inngest_err:
+    logger.warning(f"Inngest setup skipped: {_inngest_err}")

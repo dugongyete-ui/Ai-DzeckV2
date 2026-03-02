@@ -21,6 +21,8 @@ from app.infrastructure.external.cache import get_cache
 # Import all required dependencies for agent service
 from app.infrastructure.external.llm.openai_llm import OpenAILLM
 from app.infrastructure.external.sandbox.docker_sandbox import DockerSandbox
+from app.infrastructure.external.sandbox.e2b_sandbox import E2BSandbox
+from app.infrastructure.external.sandbox.hybrid_sandbox import HybridSandbox
 from app.infrastructure.external.task.redis_task import RedisStreamTask
 from app.infrastructure.utils.llm_json_parser import LLMJsonParser
 from app.infrastructure.repositories.mongo_agent_repository import MongoAgentRepository
@@ -43,13 +45,42 @@ def get_agent_service() -> AgentService:
     This function creates and returns an AgentService instance with all
     necessary dependencies. Uses lru_cache for singleton pattern.
     """
+    settings = get_settings()
     logger.info("Creating AgentService instance")
-    
+
+    # Select sandbox provider based on configuration
+    #
+    # HybridSandbox (default ketika E2B_API_KEY tersedia):
+    #   - Shell/terminal commands  → E2B cloud (isolated, secure)
+    #   - File sync                → local + E2B (agar code bisa akses file)
+    #   - Browser/VNC              → Docker lokal
+    #
+    # E2BSandbox (explicit, hanya jika SANDBOX_PROVIDER=e2b):
+    #   - Semua operasi → E2B (tanpa browser support)
+    #
+    # DockerSandbox (fallback ketika E2B tidak dikonfigurasi):
+    #   - Semua operasi → Docker lokal
+    if settings.e2b_api_key and settings.sandbox_provider != "e2b":
+        sandbox_cls = HybridSandbox
+        logger.info(
+            "E2B_API_KEY detected — using HybridSandbox: "
+            "shell/terminal via E2B cloud, browser/VNC via Docker local"
+        )
+    elif settings.sandbox_provider == "e2b":
+        if settings.e2b_api_key:
+            sandbox_cls = E2BSandbox
+            logger.info("Using pure E2B sandbox provider (no browser/VNC)")
+        else:
+            logger.warning("sandbox_provider=e2b but E2B_API_KEY is not set. Falling back to Docker.")
+            sandbox_cls = DockerSandbox
+    else:
+        sandbox_cls = DockerSandbox
+        logger.info("Using Docker sandbox provider (E2B not configured)")
+
     # Create all dependencies
     llm = OpenAILLM()
     agent_repository = MongoAgentRepository()
     session_repository = MongoSessionRepository()
-    sandbox_cls = DockerSandbox
     task_cls = RedisStreamTask
     json_parser = LLMJsonParser()
     file_storage = get_file_storage()

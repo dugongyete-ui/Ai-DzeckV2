@@ -69,6 +69,15 @@ class Settings(BaseSettings):
     
     # Logging configuration
     log_level: str = "INFO"
+
+    # E2B sandbox configuration
+    e2b_api_key: str | None = None
+    sandbox_provider: str = "docker"  # "docker" or "e2b"
+
+    # Inngest configuration
+    inngest_api_key: str | None = None
+    inngest_signing_key: str | None = None
+    inngest_app_id: str = "dzeck-ai-agent"
     
     class Config:
         env_file = ".env"
