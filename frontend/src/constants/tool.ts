@@ -65,8 +65,8 @@ export const TOOL_FUNCTION_ARG_MAP: {[key: string]: string} = {
   "browser_console_exec": "code",
   "browser_console_view": "console",
   "info_search_web": "query",
-  "message_notify_user": "message",
-  "message_ask_user": "question"
+  "message_notify_user": "text",
+  "message_ask_user": "text"
 };
 
 /**
@@ -76,6 +76,7 @@ export const TOOL_NAME_MAP: {[key: string]: string} = {
   "shell": "Terminal",
   "file": "File",
   "browser": "Browser",
+  "search": "Web Search",
   "info": "Information",
   "message": "Message",
   "mcp": "MCP Tool"

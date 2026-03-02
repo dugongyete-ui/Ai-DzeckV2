@@ -1,5 +1,5 @@
 from typing import List, Dict, Any, Optional, AsyncGenerator, Tuple
-from openai import AsyncOpenAI, RateLimitError
+from openai import AsyncOpenAI, RateLimitError, BadRequestError
 from app.domain.external.llm import LLM
 from app.core.config import get_settings
 import logging
@@ -51,6 +51,22 @@ class OpenAILLM(LLM):
             if response_format:
                 kwargs["response_format"] = response_format
         return kwargs
+
+    def _truncate_messages(self, messages: List[Dict[str, Any]], remove_fraction: float = 0.25) -> List[Dict[str, Any]]:
+        """Truncate messages by removing oldest non-system messages to reduce context size."""
+        system_msgs = [m for m in messages if m.get("role") == "system"]
+        non_system_msgs = [m for m in messages if m.get("role") != "system"]
+        if not non_system_msgs:
+            return messages
+        remove_count = max(1, int(len(non_system_msgs) * remove_fraction))
+        trimmed = non_system_msgs[remove_count:]
+        logger.warning(f"Context overflow: truncating {remove_count} oldest messages (kept {len(trimmed)} of {len(non_system_msgs)} non-system messages)")
+        return system_msgs + trimmed
+
+    def _is_context_length_error(self, error: BadRequestError) -> bool:
+        """Check if a BadRequestError is due to context length exceeding the limit."""
+        error_str = str(error).lower()
+        return any(k in error_str for k in ["context", "token", "length", "too long", "maximum", "exceed"])
 
     def _sanitize_tool_calls(self, tool_calls_dict):
         """Sanitize and assemble tool calls from streaming dict"""
@@ -126,6 +142,14 @@ class OpenAILLM(LLM):
                 await asyncio.sleep(rate_limit_delay)
                 continue
 
+            except BadRequestError as e:
+                if self._is_context_length_error(e) and attempt < max_retries:
+                    logger.warning(f"Context length exceeded on attempt {attempt + 1}, truncating messages and retrying...")
+                    messages = self._truncate_messages(messages)
+                    continue
+                logger.error(f"BadRequestError on attempt {attempt + 1}: {str(e)}")
+                raise e
+
             except Exception as e:
                 error_msg = f"Error calling LLM API on attempt {attempt + 1}: {str(e)}"
                 logger.error(error_msg)
@@ -199,6 +223,14 @@ class OpenAILLM(LLM):
                 if attempt == max_retries:
                     raise e
                 await asyncio.sleep(rate_limit_delay)
+
+            except BadRequestError as e:
+                if self._is_context_length_error(e) and attempt < max_retries:
+                    logger.warning(f"Context length exceeded on stream attempt {attempt + 1}, truncating messages and retrying...")
+                    messages = self._truncate_messages(messages)
+                    continue
+                logger.error(f"BadRequestError on stream attempt {attempt + 1}: {str(e)}")
+                raise e
 
             except Exception as e:
                 logger.error(f"Error in streaming LLM request (attempt {attempt + 1}): {str(e)}")

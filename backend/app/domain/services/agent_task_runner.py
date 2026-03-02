@@ -206,6 +206,8 @@ class AgentTaskRunner(TaskRunner):
                     if event.tool_content:
                         logger.debug(f"MCP tool_content.result: {event.tool_content.result}")
                         logger.debug(f"MCP tool_content dict: {event.tool_content.model_dump()}")
+                elif event.tool_name == "message":
+                    logger.debug(f"Message tool called: function={event.function_name}, args={event.function_args}")
                 else:
                     logger.warning(f"Agent {self._agent_id} received unknown tool event: {event.tool_name}")
         except Exception as e:
