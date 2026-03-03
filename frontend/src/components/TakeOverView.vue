@@ -43,15 +43,12 @@ const handleTakeOverEvent = (event: Event) => {
 
 // VNC event handlers
 const onVNCConnected = () => {
-    console.log('TakeOver VNC connection successful');
 };
 
-const onVNCDisconnected = (reason?: any) => {
-    console.log('TakeOver VNC connection disconnected', reason);
+const onVNCDisconnected = (_reason?: any) => {
 };
 
 const onVNCCredentialsRequired = () => {
-    console.log('TakeOver VNC credentials required');
 };
 
 // Calculate whether to show takeover view

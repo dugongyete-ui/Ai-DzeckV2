@@ -402,7 +402,6 @@ const chat = async (message: string = '', files: FileInfo[] = []) => {
                                         filename : file.filename})),
       {
         onOpen: () => {
-          console.log('Chat opened');
           isLoading.value = true;
         },
         onMessage: ({ event, data }) => {
@@ -412,7 +411,6 @@ const chat = async (message: string = '', files: FileInfo[] = []) => {
           });
         },
         onClose: () => {
-          console.log('Chat closed');
           isLoading.value = false;
           // Clear the cancel function when connection is closed normally
           if (cancelCurrentChat.value) {

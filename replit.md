@@ -41,4 +41,14 @@ The system operates by receiving user messages from the Frontend (Vue 3). These 
 -   **Cloud Sandbox:** E2B (alternative sandbox provider)
 -   **Background Jobs:** Inngest (for orchestrating background tasks like agent-task events)
 -   **VNC Client:** noVNC (embedded in the frontend)
+
+## Recent Bug Fixes & Improvements
+
+-   **JWT Secret Key:** Upgraded from 16-char key to 64-char hex key (256-bit) for HS256 security
+-   **datetime.utcnow() deprecated:** Replaced all 7 calls with `datetime.now(timezone.utc)` in auth_service.py and gridfsfile.py
+-   **VNC WebSocket URL:** Fixed regex to correctly convert `https://` → `wss://` (not just `http://` → `ws://`)
+-   **ensure_sandbox:** Restored suppressed exception so sandbox startup failures fail explicitly instead of silently proceeding
+-   **SharePage.vue wait event:** Implemented handler — sets isLoading to false when agent enters waiting state
+-   **Console.log cleanup:** Removed all informational console.log from ChatPage, TakeOverView, VNCViewer, and LeftPanel; error-level logs retained
+-   **Web Search:** Replaced Bing scraper (bot-blocked) with DuckDuckGo HTML endpoint returning 10 clean results
 -   **Code Editor:** Monaco Editor

@@ -136,7 +136,6 @@ const fetchSessions = async () => {
     }
     cancelGetSessionsSSE.value = await getSessionsSSE({
       onOpen: () => {
-        console.log('Sessions SSE opened')
       },
       onMessage: (event) => {
         sessions.value = event.data.sessions
@@ -145,7 +144,6 @@ const fetchSessions = async () => {
         console.error('Failed to fetch sessions:', error)
       },
       onClose: () => {
-        console.log('Sessions SSE closed')
       }
     })
   } catch (error) {
@@ -158,7 +156,6 @@ const handleNewTaskClick = () => {
 }
 
 const handleSessionDeleted = (sessionId: string) => {
-  console.log('handleSessionDeleted', sessionId)
   sessions.value = sessions.value.filter(session => session.session_id !== sessionId);
 }
 

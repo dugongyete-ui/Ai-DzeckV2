@@ -174,8 +174,7 @@ class DockerSandbox(Sandbox):
         # If we reach here, we've exhausted all retries
         error_message = f"Sandbox services failed to start after {max_retries} attempts ({max_retries * retry_interval} seconds)"
         logger.error(error_message)
-        # TODO: find a way to handle this
-        #raise Exception(error_message)
+        raise Exception(error_message)
 
     async def exec_command(self, session_id: str, exec_dir: str, command: str) -> ToolResult:
         response = await self.client.post(
