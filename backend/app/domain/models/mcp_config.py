@@ -8,6 +8,7 @@ class MCPTransport(str, Enum):
     STDIO = "stdio"
     SSE = "sse"
     STREAMABLE_HTTP = "streamable-http"
+    WEBSOCKET = "websocket"
 
 
 class MCPServerConfig(BaseModel):
@@ -22,6 +23,9 @@ class MCPServerConfig(BaseModel):
     url: Optional[str] = None
     headers: Optional[Dict[str, str]] = None
     
+    # For WebSocket transport (token passed as Authorization header)
+    token: Optional[str] = None
+    
     # Common fields
     transport: MCPTransport
     enabled: bool = Field(default=True)
@@ -33,8 +37,8 @@ class MCPServerConfig(BaseModel):
         """Validate URL is required for HTTP-based transports"""
         if hasattr(values, 'data'):
             transport = values.data.get('transport')
-            if transport in [MCPTransport.SSE, MCPTransport.STREAMABLE_HTTP] and not v:
-                raise ValueError("URL is required for HTTP-based transports")
+            if transport in [MCPTransport.SSE, MCPTransport.STREAMABLE_HTTP, MCPTransport.WEBSOCKET] and not v:
+                raise ValueError("URL is required for HTTP-based and WebSocket transports")
         return v
     
     @field_validator("command")

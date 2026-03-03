@@ -1,19 +1,77 @@
 import os
+import json
 import logging
+import asyncio
 from typing import Dict, Any, List, Optional
-from contextlib import AsyncExitStack
+from contextlib import AsyncExitStack, asynccontextmanager
+
+import anyio
+import anyio.abc
+from anyio.streams.memory import MemoryObjectReceiveStream, MemoryObjectSendStream
+import websockets
+from websockets.exceptions import ConnectionClosedError, ConnectionClosedOK
 
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 from mcp.client.sse import sse_client
 from mcp.client.streamable_http import streamablehttp_client
-from mcp.types import Tool as MCPTool
+from mcp.types import Tool as MCPTool, JSONRPCMessage
 
 from app.domain.services.tools.base import BaseTool, tool
 from app.domain.models.tool_result import ToolResult
 from app.domain.models.mcp_config import MCPConfig, MCPServerConfig
 
 logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def websocket_client(url: str, headers: Optional[Dict[str, str]] = None):
+    """
+    WebSocket MCP transport client.
+    Bridges a WebSocket connection to anyio memory streams compatible with MCP ClientSession.
+    """
+    read_send, read_recv = anyio.create_memory_object_stream(max_buffer_size=100)
+    write_send, write_recv = anyio.create_memory_object_stream(max_buffer_size=100)
+
+    async def ws_reader(ws, send_stream):
+        """Read from WebSocket and push to read stream."""
+        try:
+            async for raw in ws:
+                try:
+                    data = json.loads(raw)
+                    msg = JSONRPCMessage.model_validate(data)
+                    await send_stream.send(msg)
+                except Exception as e:
+                    logger.warning(f"WebSocket: failed to parse message: {e}")
+        except (ConnectionClosedOK, ConnectionClosedError):
+            pass
+        except Exception as e:
+            logger.error(f"WebSocket reader error: {e}")
+        finally:
+            await send_stream.aclose()
+
+    async def ws_writer(ws, recv_stream):
+        """Read from write stream and send to WebSocket."""
+        try:
+            async for msg in recv_stream:
+                try:
+                    raw = msg.model_dump_json(by_alias=True, exclude_none=True)
+                    await ws.send(raw)
+                except Exception as e:
+                    logger.warning(f"WebSocket: failed to send message: {e}")
+        except Exception as e:
+            logger.error(f"WebSocket writer error: {e}")
+
+    connect_kwargs = {"additional_headers": headers or {}}
+
+    async with websockets.connect(url, **connect_kwargs) as ws:
+        async with anyio.create_task_group() as tg:
+            tg.start_soon(ws_reader, ws, read_send)
+            tg.start_soon(ws_writer, ws, write_recv)
+            try:
+                yield read_recv, write_send
+            finally:
+                tg.cancel_scope.cancel()
 
 
 class MCPClientManager:
@@ -69,6 +127,8 @@ class MCPClientManager:
                 await self._connect_http_server(server_name, server_config)
             elif transport_type == 'streamable-http':
                 await self._connect_streamable_http_server(server_name, server_config)
+            elif transport_type == 'websocket':
+                await self._connect_websocket_server(server_name, server_config)
             else:
                 logger.error(f"不支持的传输类型: {transport_type}")
                 
@@ -205,7 +265,48 @@ class MCPClientManager:
         except Exception as e:
             logger.error(f"连接到 streamable-http MCP 服务器 {server_name} 失败: {e}")
             raise
-    
+
+    async def _connect_websocket_server(self, server_name: str, server_config: MCPServerConfig):
+        """连接到 WebSocket MCP 服务器
+        
+        配置选项：
+        - url: WebSocket URL，支持 ws:// 和 wss:// (必需)
+        - token: Bearer 令牌，将作为 Authorization 头发送 (可选)
+        - headers: 自定义 HTTP 头 (可选)
+        """
+        url = server_config.url
+        if not url:
+            raise ValueError(f"服务器 {server_name} 缺少 url 配置")
+
+        # 构建认证头
+        ws_headers: Dict[str, str] = {}
+        if server_config.token:
+            ws_headers["Authorization"] = f"Bearer {server_config.token}"
+        if server_config.headers:
+            ws_headers.update(server_config.headers)
+
+        try:
+            ws_transport = await self._exit_stack.enter_async_context(
+                websocket_client(url, headers=ws_headers)
+            )
+            read_stream, write_stream = ws_transport
+
+            session = await self._exit_stack.enter_async_context(
+                ClientSession(read_stream, write_stream)
+            )
+
+            await session.initialize()
+
+            self._clients[server_name] = session
+
+            await self._cache_server_tools(server_name, session)
+
+            logger.info(f"成功连接到 WebSocket MCP 服务器: {server_name} ({url})")
+
+        except Exception as e:
+            logger.error(f"连接到 WebSocket MCP 服务器 {server_name} 失败: {e}")
+            raise
+
     async def _cache_server_tools(self, server_name: str, session: ClientSession):
         """缓存服务器工具列表"""
         try:

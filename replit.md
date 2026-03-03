@@ -41,6 +41,7 @@ The system operates by receiving user messages from the Frontend (Vue 3). These 
 -   **Cloud Sandbox:** E2B (alternative sandbox provider)
 -   **Background Jobs:** Inngest (for orchestrating background tasks like agent-task events)
 -   **VNC Client:** noVNC (embedded in the frontend)
+-   **MCP Gateway:** Oblien (`wss://workspace.oblien.com/mcp`) — provides terminal, WebSocket, SDK, MCP, and REST API access via the workspace gateway
 
 ## Recent Bug Fixes & Improvements
 
@@ -52,3 +53,4 @@ The system operates by receiving user messages from the Frontend (Vue 3). These 
 -   **Console.log cleanup:** Removed all informational console.log from ChatPage, TakeOverView, VNCViewer, and LeftPanel; error-level logs retained
 -   **Web Search:** Replaced Bing scraper (bot-blocked) with DuckDuckGo HTML endpoint returning 10 clean results
 -   **Code Editor:** Monaco Editor
+-   **Oblien MCP Gateway:** Added WebSocket transport support for MCP. Configured Oblien workspace gateway (`wss://workspace.oblien.com/mcp`) in `mcp.json`. Added `token` field to `MCPServerConfig` model (sent as `Authorization: Bearer` header). MCP config path set via `MCP_CONFIG_PATH=/home/runner/workspace/mcp.json` in `backend/.env`.
