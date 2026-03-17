@@ -4,12 +4,12 @@ from functools import lru_cache
 
 class Settings(BaseSettings):
     
-    # Model provider configuration
+    # Model provider configuration (Cloudflare Workers AI via AI Gateway)
     api_key: str | None = None
-    api_base: str = "https://api.deepseek.com/v1"
+    api_base: str = "https://gateway.ai.cloudflare.com/v1/<account_id>/<gateway_id>/workers-ai/v1"
     
     # Model configuration
-    model_name: str = "deepseek-chat"
+    model_name: str = "@cf/meta/llama-3-8b-instruct"
     temperature: float = 0.7
     max_tokens: int = 2000
     
@@ -72,7 +72,7 @@ class Settings(BaseSettings):
 
     # E2B sandbox configuration
     e2b_api_key: str | None = None
-    sandbox_provider: str = "docker"  # "docker" or "e2b"
+    sandbox_provider: str = "e2b"  # "e2b", "hybrid", or "docker"
 
     # Inngest configuration
     inngest_api_key: str | None = None
@@ -92,4 +92,4 @@ def get_settings() -> Settings:
     """Get application settings"""
     settings = Settings()
     settings.validate()
-    return settings 
+    return settings        

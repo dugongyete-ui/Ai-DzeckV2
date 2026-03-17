@@ -50,32 +50,27 @@ def get_agent_service() -> AgentService:
 
     # Select sandbox provider based on configuration
     #
-    # HybridSandbox (default ketika E2B_API_KEY tersedia):
-    #   - Shell/terminal commands  → E2B cloud (isolated, secure)
-    #   - File sync                → local + E2B (agar code bisa akses file)
-    #   - Browser/VNC              → Docker lokal
+    # E2BSandbox (WAJIB / mandatory):
+    #   - Semua operasi → E2B cloud (isolated, secure)
+    #   - Tidak ada fallback ke Docker/local
     #
-    # E2BSandbox (explicit, hanya jika SANDBOX_PROVIDER=e2b):
-    #   - Semua operasi → E2B (tanpa browser support)
-    #
-    # DockerSandbox (fallback ketika E2B tidak dikonfigurasi):
-    #   - Semua operasi → Docker lokal
-    if settings.e2b_api_key and settings.sandbox_provider != "e2b":
+    # HybridSandbox (opsional, jika sandbox_provider=hybrid):
+    #   - Shell/terminal → E2B cloud
+    #   - Browser/VNC → Docker lokal
+    if settings.sandbox_provider == "hybrid" and settings.e2b_api_key:
         sandbox_cls = HybridSandbox
         logger.info(
-            "E2B_API_KEY detected — using HybridSandbox: "
+            "Using HybridSandbox: "
             "shell/terminal via E2B cloud, browser/VNC via Docker local"
         )
-    elif settings.sandbox_provider == "e2b":
-        if settings.e2b_api_key:
-            sandbox_cls = E2BSandbox
-            logger.info("Using pure E2B sandbox provider (no browser/VNC)")
-        else:
-            logger.warning("sandbox_provider=e2b but E2B_API_KEY is not set. Falling back to Docker.")
-            sandbox_cls = DockerSandbox
     else:
-        sandbox_cls = DockerSandbox
-        logger.info("Using Docker sandbox provider (E2B not configured)")
+        if not settings.e2b_api_key:
+            raise ValueError(
+                "E2B_API_KEY is required. All sandbox operations must use E2B. "
+                "Set E2B_API_KEY in your environment."
+            )
+        sandbox_cls = E2BSandbox
+        logger.info("Using pure E2B sandbox provider — all operations via E2B cloud")
 
     # Create all dependencies
     llm = OpenAILLM()

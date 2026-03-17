@@ -10,6 +10,9 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/settings", tags=["settings"])
 
 PREDEFINED_MODELS = [
+    "@cf/meta/llama-3-8b-instruct",
+    "@cf/meta/llama-3.1-8b-instruct",
+    "@cf/meta/llama-3.2-3b-instruct",
     "gpt-4o",
     "gpt-4o-mini",
     "gpt-4-turbo",
