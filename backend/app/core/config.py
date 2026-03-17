@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     redis_port: int = 16364
     redis_db: int = 0
     redis_password: str | None = "0W7ImuMIUrkUTF0wxYSkIWmc8MRjPrYX"
-    redis_ssl: bool = True
+    redis_ssl: bool = False
     
     # Sandbox configuration
     sandbox_address: str | None = None
@@ -92,4 +92,4 @@ def get_settings() -> Settings:
     """Get application settings"""
     settings = Settings()
     settings.validate()
-    return settings  
+    return settings    
