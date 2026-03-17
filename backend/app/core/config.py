@@ -4,27 +4,27 @@ from functools import lru_cache
 
 class Settings(BaseSettings):
     
-    # Model provider configuration
-    api_key: str | None = None
-    api_base: str = "https://api.deepseek.com/v1"
+    # Model provider configuration (Cloudflare Workers AI via AI Gateway)
+    api_key: str | None = "YsjNngJW0aFPVNSxuCCANgzTePXfiOSHu5w-V62h"
+    api_base: str = "https://gateway.ai.cloudflare.com/v1/6c807fe58ad83714e772403cd528dbeb/dzeck/workers-ai/v1"
     
     # Model configuration
-    model_name: str = "deepseek-chat"
+    model_name: str = "@cf/meta/llama-3-8b-instruct"
     temperature: float = 0.7
     max_tokens: int = 2000
     
     # MongoDB configuration
-    mongodb_uri: str = "mongodb://mongodb:27017"
+    mongodb_uri: str = "mongodb+srv://galerizaki_db_user:wTkfzrqewY5qCxYG@cluster0.vmiek8b.mongodb.net/manus?retryWrites=true&w=majority"
     mongodb_database: str = "manus"
     mongodb_username: str | None = None
     mongodb_password: str | None = None
     
     # Redis configuration
-    redis_host: str = "redis"
-    redis_port: int = 6379
+    redis_host: str = "redis-16364.c279.us-central1-1.gce.cloud.redislabs.com"
+    redis_port: int = 16364
     redis_db: int = 0
-    redis_password: str | None = None
-    redis_ssl: bool = False
+    redis_password: str | None = "0W7ImuMIUrkUTF0wxYSkIWmc8MRjPrYX"
+    redis_ssl: bool = True
     
     # Sandbox configuration
     sandbox_address: str | None = None
@@ -71,8 +71,8 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
 
     # E2B sandbox configuration
-    e2b_api_key: str | None = None
-    sandbox_provider: str = "docker"  # "docker" or "e2b"
+    e2b_api_key: str | None = "e2b_566a6a5f596ccabdd31defe243791117791220b2"
+    sandbox_provider: str = "e2b"  # "docker" or "e2b"
 
     # Inngest configuration
     inngest_api_key: str | None = None
@@ -92,4 +92,4 @@ def get_settings() -> Settings:
     """Get application settings"""
     settings = Settings()
     settings.validate()
-    return settings 
+    return settings  
