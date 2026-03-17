@@ -72,7 +72,7 @@ class Settings(BaseSettings):
 
     # E2B sandbox configuration
     e2b_api_key: str | None = None
-    sandbox_provider: str = "e2b"  # "docker" or "e2b"
+    sandbox_provider: str = "e2b"  # "e2b", "hybrid", or "docker"
 
     # Inngest configuration
     inngest_api_key: str | None = None
@@ -92,4 +92,4 @@ def get_settings() -> Settings:
     """Get application settings"""
     settings = Settings()
     settings.validate()
-    return settings      
+    return settings        

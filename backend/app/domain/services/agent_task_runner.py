@@ -49,7 +49,7 @@ class AgentTaskRunner(TaskRunner):
         user_id: str,
         llm: LLM,
         sandbox: Sandbox,
-        browser: Browser,
+        browser: Optional[Browser],
         agent_repository: AgentRepository,
         session_repository: SessionRepository,
         json_parser: JsonParser,
@@ -98,7 +98,10 @@ class AgentTaskRunner(TaskRunner):
         event.id = event_id
         return event
     
-    async def _get_browser_screenshot(self) -> str:
+    async def _get_browser_screenshot(self) -> Optional[str]:
+        if not self._browser:
+            logger.warning("Browser not available — skipping screenshot")
+            return None
         screenshot = await self._browser.screenshot()
         result = await self._file_storage.upload_file(screenshot, "screenshot.png", self._user_id)
         return result.file_id
@@ -164,7 +167,12 @@ class AgentTaskRunner(TaskRunner):
         try:
             if event.status == ToolStatus.CALLED:
                 if event.tool_name == "browser":
-                    event.tool_content = BrowserToolContent(screenshot=await self._get_browser_screenshot())
+                    screenshot_id = await self._get_browser_screenshot()
+                    if screenshot_id:
+                        event.tool_content = BrowserToolContent(screenshot=screenshot_id)
+                    else:
+                        logger.warning("Browser tool called but browser is not available (E2B sandbox)")
+                        event.tool_content = BrowserToolContent(screenshot="")
                 elif event.tool_name == "search":
                     search_results: ToolResult[SearchResults] = event.function_result
                     logger.debug(f"Search tool results: {search_results}")

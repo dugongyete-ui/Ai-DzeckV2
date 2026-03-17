@@ -212,11 +212,9 @@ class E2BSandbox(Sandbox):
             raw = raw.encode("utf-8")
         return io.BytesIO(raw)
 
-    async def get_browser(self) -> Browser:
-        raise NotImplementedError(
-            "Browser/VNC is not supported in E2B sandbox. "
-            "Switch to SANDBOX_PROVIDER=docker for browser features."
-        )
+    async def get_browser(self) -> Optional[Browser]:
+        logger.info("Browser/VNC is not supported in E2B sandbox — returning None")
+        return None
 
     async def destroy(self) -> bool:
         try:
